@@ -1,48 +1,77 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { LegalCustomer, LegalCustomersResponse } from '@/types/dashboard';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 const BASE_URL = "http://localhost:8000";
 
+function exportToCSV(data: any[], filename: string) {
+  if (!data.length) return;
+  const keys = Object.keys(data[0]);
+  const csvRows = [
+    keys.join(','),
+    ...data.map(row => keys.map(k => JSON.stringify(row[k] ?? '')).join(','))
+  ];
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+type SortableLegalCustomerField = 'legal_name' | 'client_id' | 'created_at';
+
 export default function LegalCustomersPage() {
-  const [legalCustomers, setLegalCustomers] = useState<LegalCustomer[]>([]);
+  const [legalCustomers, setLegalCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'legal_name' | 'client_id' | 'created_at'>('legal_name');
+  const [sortBy, setSortBy] = useState<SortableLegalCustomerField>('legal_name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selected, setSelected] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
 
   useEffect(() => {
     const fetchLegalCustomers = async () => {
+      setLoading(true);
       try {
-        const response = await fetch(`${BASE_URL}/api/v1/legal-customers`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        const data: LegalCustomersResponse = await response.json();
-        setLegalCustomers(data.legal_customers);
+        const response = await fetch(`${BASE_URL}/api/v1/legal-customers`);
+        if (!response.ok) throw new Error('Failed to fetch legal customers');
+        const data = await response.json();
+        setLegalCustomers(Array.isArray(data.legal_customers) ? data.legal_customers : []);
       } catch (err) {
-        setError('Failed to fetch legal customers');
-        console.error('Error fetching legal customers:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch legal customers');
       } finally {
         setLoading(false);
       }
     };
-
     fetchLegalCustomers();
   }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this legal customer?')) return;
+    setDeletingId(id);
+    try {
+      const response = await fetch(`${BASE_URL}/api/v1/legal-customers/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete legal customer');
+      setLegalCustomers(prev => prev.filter((c: any) => c.id !== id));
+      setSelected(prev => prev.filter(cid => cid !== id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete legal customer');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Filter and sort logic
   const filteredCustomers = legalCustomers.filter(cust =>
     cust.legal_name?.toLowerCase().includes(filter.toLowerCase()) ||
     cust.client_id?.toLowerCase().includes(filter.toLowerCase())
   );
-
   const sortedCustomers = [...filteredCustomers].sort((a, b) => {
     let aVal = '', bVal = '';
     if (sortBy === 'legal_name') {
@@ -64,7 +93,6 @@ export default function LegalCustomersPage() {
   const handleSelect = (id: string) => {
     setSelected(prev => prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]);
   };
-
   const handleSelectAll = () => {
     if (selectAll) {
       setSelected([]);
@@ -77,104 +105,102 @@ export default function LegalCustomersPage() {
 
   const handleExport = () => {
     const exportData = sortedCustomers.filter(c => selected.includes(c.id));
-    const csvContent = [
-      ['ID', 'Legal Name', 'Client ID', 'Address', 'Created At', 'Updated At'],
-      ...exportData.map(c => [
-        c.id,
-        c.legal_name,
-        c.client_id,
-        c.address,
-        c.created_at,
-        c.updated_at
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'legal_customers.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportToCSV(exportData.length ? exportData : sortedCustomers, 'legal_customers.csv');
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Legal Customers</h1>
-      <div className="mb-4 flex gap-4 items-center">
-        <input
-          type="text"
-          placeholder="Filter..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="border p-2 rounded"
-        />
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="border p-2 rounded"
-        >
-          <option value="legal_name">Legal Name</option>
-          <option value="client_id">Client ID</option>
-          <option value="created_at">Created At</option>
-        </select>
-        <button
-          onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-          className="border p-2 rounded"
-        >
-          {sortOrder === 'asc' ? '↑' : '↓'}
-        </button>
-        <button
-          onClick={handleExport}
-          disabled={selected.length === 0}
-          className="border p-2 rounded bg-blue-500 text-white disabled:bg-gray-300"
-        >
-          Export Selected
-        </button>
+    <div className="p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            placeholder="Filter by legal name or client id"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-black"
+          />
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as SortableLegalCustomerField)}
+            className="border border-gray-300 rounded-md px-2 py-2 text-black"
+          >
+            <option value="legal_name">Legal Name</option>
+            <option value="client_id">Client ID</option>
+            <option value="created_at">Created At</option>
+          </select>
+          <button
+            onClick={() => setSortOrder(o => (o === 'asc' ? 'desc' : 'asc'))}
+            className="border border-gray-300 rounded-md px-2 py-2 text-black"
+            title="Toggle sort order"
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700"
+          >
+            Export CSV
+          </button>
+          <Link href="/dashboard/legal-customers/new">
+            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              Add Legal Customer
+            </button>
+          </Link>
+        </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full border">
-          <thead>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="border p-2">
+              <th className="px-4 py-3">
                 <input
                   type="checkbox"
                   checked={selectAll}
                   onChange={handleSelectAll}
+                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
                 />
               </th>
-              <th className="border p-2">Legal Name</th>
-              <th className="border p-2">Client ID</th>
-              <th className="border p-2">Address</th>
-              <th className="border p-2">Created At</th>
-              <th className="border p-2">Updated At</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Legal Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client ID</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
-          <tbody>
-            {sortedCustomers.map((customer) => (
+          <tbody className="bg-white divide-y divide-gray-200">
+            {sortedCustomers.map(customer => (
               <tr key={customer.id}>
-                <td className="border p-2">
+                <td className="px-4 py-3">
                   <input
                     type="checkbox"
                     checked={selected.includes(customer.id)}
                     onChange={() => handleSelect(customer.id)}
+                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
                   />
                 </td>
-                <td className="border p-2">{customer.legal_name}</td>
-                <td className="border p-2">{customer.client_id}</td>
-                <td className="border p-2">{customer.address}</td>
-                <td className="border p-2">{new Date(customer.created_at).toLocaleDateString()}</td>
-                <td className="border p-2">{new Date(customer.updated_at).toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-black font-medium">{customer.legal_name}</td>
+                <td className="px-4 py-3 text-black">{customer.client_id}</td>
+                <td className="px-4 py-3 text-black">{customer.address}</td>
+                <td className="px-4 py-3 text-black">{customer.created_at ? new Date(customer.created_at).toLocaleDateString() : ''}</td>
+                <td className="px-4 py-3 flex items-center gap-2">
+                  <Link href={`/dashboard/legal-customers/${customer.id}`}>
+                    <button className="text-indigo-600 hover:text-indigo-900 font-semibold">View Details</button>
+                  </Link>
+                  <button onClick={() => handleDelete(customer.id)} disabled={deletingId === customer.id} className="ml-6 text-red-600 hover:text-red-800" title="Delete">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5h6v2m2 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V7h12z" />
+                    </svg>
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {loading && <div className="mt-4">Loading...</div>}
+      {error && <div className="mt-4 text-red-600">{error}</div>}
     </div>
   );
 } 
