@@ -1,38 +1,27 @@
-interface Invoice {
-  id: string;
-  total: number;
-  currency: string;
-  date_generated: string;
-  pdf_url: string;
+import { Invoice } from '@/types/dashboard';
+
+interface InvoiceItemProps {
+  invoice: Invoice;
 }
 
-export default function InvoiceItem({ invoice }: { invoice: Invoice }) {
+export default function InvoiceItem({ invoice }: InvoiceItemProps) {
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">
-          Invoice #{invoice.id.slice(-6)}
-        </p>
-        <div className="mt-1 flex items-center text-sm text-gray-500">
-          <span className="truncate">
-            {invoice.total.toFixed(2)} {invoice.currency}
-          </span>
-        </div>
-      </div>
-      <div className="ml-4 flex-shrink-0 flex space-x-2">
+    <div className="border p-4 rounded-lg">
+      <p className="font-semibold">Invoice #{invoice.id}</p>
+      <p className="text-gray-600">Client ID: {invoice.client_id}</p>
+      <p className="text-gray-600">Customer ID: {invoice.customer_id}</p>
+      <p className="text-gray-600">Amount: {invoice.currency} {invoice.total}</p>
+      <p className="text-gray-600">Date Generated: {new Date(invoice.date_generated).toLocaleDateString()}</p>
+      {invoice.pdf_url && (
         <a
           href={invoice.pdf_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-indigo-600 hover:text-indigo-900 text-sm"
+          className="text-blue-600 hover:text-blue-800"
         >
-          PDF
+          View PDF
         </a>
-        <span className="text-gray-500">•</span>
-        <span className="text-sm text-gray-500">
-          {new Date(invoice.date_generated).toLocaleDateString()}
-        </span>
-      </div>
+      )}
     </div>
   );
 } 

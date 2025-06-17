@@ -119,7 +119,7 @@ export default function NewClientPage() {
       const [parent, child] = name.split('.');
       if (parent === 'settings') {
         if (child === 'notification_settings') {
-          const [setting, field] = name.split('.').slice(2);
+          const [field] = name.split('.').slice(2);
           setClient(prev => ({
             ...prev,
             settings: {

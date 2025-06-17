@@ -140,7 +140,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
       const [parent, child] = name.split('.');
       if (parent === 'settings') {
         if (child === 'notification_settings') {
-          const [setting, field] = name.split('.').slice(2);
+          const [field] = name.split('.').slice(2);
           setEditedClient(prev => {
             if (!prev) return prev;
             return {
@@ -167,16 +167,16 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this client?')) return;
-    try {
-      const response = await fetch(`${BASE_URL}/api/v1/clients/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete client');
-      router.push('/dashboard/clients');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete client');
-    }
-  };
+  // const handleDelete = async () => {
+  //   if (!confirm('Are you sure you want to delete this client?')) return;
+  //   try {
+  //     const response = await fetch(`${BASE_URL}/api/v1/clients/${id}`, { method: 'DELETE' });
+  //     if (!response.ok) throw new Error('Failed to delete client');
+  //     router.push('/dashboard/clients');
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : 'Failed to delete client');
+  //   }
+  // };
 
   if (loading) {
     return (
@@ -219,7 +219,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
             <div className="ml-3">
               <h3 className="text-sm font-medium text-yellow-800">Client not found</h3>
               <div className="mt-2 text-sm text-yellow-700">
-                The client you're looking for doesn't exist or has been deleted.
+                The client you&apos;re looking for doesn&apos;t exist or has been deleted.
               </div>
             </div>
           </div>

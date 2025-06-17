@@ -97,7 +97,7 @@ export default function NewInvoicePage() {
     const { name, value, type } = e.target;
     
     if (name.startsWith('items.')) {
-      const [_, index, field] = name.split('.');
+      const [index, field] = name.split('.');
       const itemIndex = parseInt(index);
       setInvoice(prev => ({
         ...prev,

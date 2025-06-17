@@ -97,7 +97,7 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
     const { name, value, type } = e.target;
     
     if (name.startsWith('items.')) {
-      const [_, index, field] = name.split('.');
+      const [ index, field] = name.split('.');
       const itemIndex = parseInt(index);
       setEditedInvoice(prev => {
         if (!prev) return prev;
@@ -166,16 +166,16 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
     }, 0);
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this invoice?')) return;
-    try {
-      const response = await fetch(`${BASE_URL}/api/v1/invoices/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete invoice');
-      router.push('/dashboard/invoices');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete invoice');
-    }
-  };
+  // const handleDelete = async () => {
+  //   if (!confirm('Are you sure you want to delete this invoice?')) return;
+  //   try {
+  //     const response = await fetch(`${BASE_URL}/api/v1/invoices/${id}`, { method: 'DELETE' });
+  //     if (!response.ok) throw new Error('Failed to delete invoice');
+  //     router.push('/dashboard/invoices');
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : 'Failed to delete invoice');
+  //   }
+  // };
 
   if (loading) {
     return (
@@ -218,7 +218,7 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
             <div className="ml-3">
               <h3 className="text-sm font-medium text-yellow-800">Invoice not found</h3>
               <div className="mt-2 text-sm text-yellow-700">
-                The invoice you're looking for doesn't exist or has been deleted.
+                The invoice you&apos;re looking for doesn&apos;t exist or has been deleted.
               </div>
             </div>
           </div>

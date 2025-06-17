@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Invoice } from '@/types/dashboard';
 
 const BASE_URL = "http://localhost:8000";
 
-function exportToCSV(data: any[], filename: string) {
+function exportToCSV(data: Invoice[], filename: string) {
   if (!data.length) return;
   const keys = Object.keys(data[0]);
   const csvRows = [
     keys.join(','),
-    ...data.map(row => keys.map(k => JSON.stringify(row[k] ?? '')).join(','))
+    ...data.map(row => keys.map(k => JSON.stringify(row[k as keyof Invoice] ?? '')).join(','))
   ];
   const csvContent = csvRows.join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -25,7 +26,7 @@ function exportToCSV(data: any[], filename: string) {
 type SortableInvoiceField = 'invoice_number' | 'client_name' | 'created_at' | 'amount';
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export default function InvoicesPage() {
     try {
       const response = await fetch(`${BASE_URL}/api/v1/invoices/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete invoice');
-      setInvoices(prev => prev.filter((inv: any) => inv.id !== id));
+      setInvoices(prev => prev.filter((inv: Invoice) => inv.id !== id));
       setSelected(prev => prev.filter(cid => cid !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete invoice');

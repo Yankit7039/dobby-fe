@@ -1,16 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
+import { TimeLog, TimeLogsResponse } from '@/types/dashboard';
 import Link from 'next/link';
 
 const BASE_URL = "http://localhost:8000";
 
-function exportToCSV(data: any[], filename: string) {
+function exportToCSV(data: TimeLog[], filename: string) {
   if (!data.length) return;
   const keys = Object.keys(data[0]);
   const csvRows = [
     keys.join(','),
-    ...data.map(row => keys.map(k => JSON.stringify(row[k] ?? '')).join(','))
+    ...data.map(row => keys.map(k => JSON.stringify(row[k as keyof TimeLog] ?? '')).join(','))
   ];
   const csvContent = csvRows.join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -24,19 +25,19 @@ function exportToCSV(data: any[], filename: string) {
 
 type SortableTimeLogField = 'client_id' | 'task_description' | 'date' | 'amount';
 
-interface TimeLog {
-  id: string;
-  user_id: string;
-  client_id: string;
-  legal_customers_id: string;
-  billable_hours: number | null;
-  task_description: string;
-  status: string;
-  amount: number;
-  date: string;
-  created_at: string;
-  updated_at: string;
-}
+// interface TimeLog {
+//   id: string;
+//   user_id: string;
+//   client_id: string;
+//   legal_customers_id: string;
+//   billable_hours: number | null;
+//   task_description: string;
+//   status: string;
+//   amount: number;
+//   date: string;
+//   created_at: string;
+//   updated_at: string;
+// }
 
 export default function TimeLogsPage() {
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
@@ -51,18 +52,23 @@ export default function TimeLogsPage() {
 
   useEffect(() => {
     const fetchTimeLogs = async () => {
-      setLoading(true);
       try {
-        const response = await fetch(`${BASE_URL}/api/v1/work-logs`);
-        if (!response.ok) throw new Error('Failed to fetch time logs');
-        const data = await response.json();
-        setTimeLogs(Array.isArray(data.work_logs) ? data.work_logs : []);
+        const response = await fetch(`${BASE_URL}/api/v1/work-logs`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        const data: TimeLogsResponse = await response.json();
+        setTimeLogs(data.work_logs);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch time logs');
+        setError('Failed to fetch time logs');
+        console.error('Error fetching time logs:', err);
       } finally {
         setLoading(false);
       }
     };
+
     fetchTimeLogs();
   }, []);
 
@@ -72,7 +78,7 @@ export default function TimeLogsPage() {
     try {
       const response = await fetch(`${BASE_URL}/api/v1/work-logs/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete time log');
-      setTimeLogs(prev => prev.filter((log: any) => log.id !== id));
+      setTimeLogs(prev => prev.filter((log: TimeLog) => log.id !== id));
       setSelected(prev => prev.filter(cid => cid !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete time log');
@@ -152,7 +158,8 @@ export default function TimeLogsPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Time Logs</h1>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
         <div className="flex gap-2 items-center">
           <input
@@ -245,8 +252,6 @@ export default function TimeLogsPage() {
           </tbody>
         </table>
       </div>
-      {loading && <div className="mt-4">Loading...</div>}
-      {error && <div className="mt-4 text-red-600">{error}</div>}
     </div>
   );
 } 

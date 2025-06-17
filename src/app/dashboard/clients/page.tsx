@@ -38,12 +38,12 @@ interface Client {
   updated_at: string;
 }
 
-function exportToCSV(data: any[], filename: string) {
+function exportToCSV(data: Client[], filename: string) {
   if (!data.length) return;
   const keys = Object.keys(data[0]);
   const csvRows = [
     keys.join(','),
-    ...data.map(row => keys.map(k => JSON.stringify(row[k] ?? '')).join(','))
+    ...data.map(row => keys.map(k => JSON.stringify(row[k as keyof Client] ?? '')).join(','))
   ];
   const csvContent = csvRows.join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -95,7 +95,7 @@ export default function ClientsPage() {
     try {
       const response = await fetch(`${BASE_URL}/api/v1/clients/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete client');
-      setClients(prev => prev.filter((c: any) => c.id !== id));
+      setClients(prev => prev.filter((c: Client) => c.id !== id));
       setSelected(prev => prev.filter(cid => cid !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete client');

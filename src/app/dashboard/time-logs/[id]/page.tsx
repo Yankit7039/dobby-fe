@@ -71,16 +71,16 @@ export default function TimeLogDetailsPage({ params }: { params: Promise<{ id: s
       setError(err instanceof Error ? err.message : "Failed to update time log");
     }
   };
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this time log?')) return;
-    try {
-      const response = await fetch(`${BASE_URL}/api/v1/work-logs/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete time log');
-      router.push('/dashboard/time-logs');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete time log');
-    }
-  };
+  // const handleDelete = async () => {
+  //   if (!confirm('Are you sure you want to delete this time log?')) return;
+  //   try {
+  //     const response = await fetch(`${BASE_URL}/api/v1/work-logs/${id}`, { method: 'DELETE' });
+  //     if (!response.ok) throw new Error('Failed to delete time log');
+  //     router.push('/dashboard/time-logs');
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : 'Failed to delete time log');
+  //   }
+  // };
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;

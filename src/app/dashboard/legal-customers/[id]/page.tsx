@@ -1,17 +1,9 @@
 "use client";
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { LegalCustomer, LegalCustomerResponse } from '@/types/dashboard';
 
 const BASE_URL = "http://localhost:8000";
-
-interface LegalCustomer {
-  id: string;
-  client_id: string;
-  legal_name: string;
-  address: string;
-  created_at?: string;
-  updated_at?: string;
-}
 
 export default function LegalCustomerDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -27,9 +19,9 @@ export default function LegalCustomerDetailsPage({ params }: { params: Promise<{
       try {
         const response = await fetch(`${BASE_URL}/api/v1/legal-customers/${id}`);
         if (!response.ok) throw new Error("Failed to fetch legal customer");
-        const data = await response.json();
-        setCustomer(data);
-        setEditedCustomer(data);
+        const data: LegalCustomerResponse = await response.json();
+        setCustomer(data.legal_customer);
+        setEditedCustomer(data.legal_customer);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch legal customer");
       } finally {
@@ -66,16 +58,16 @@ export default function LegalCustomerDetailsPage({ params }: { params: Promise<{
       setError(err instanceof Error ? err.message : "Failed to update legal customer");
     }
   };
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this legal customer?')) return;
-    try {
-      const response = await fetch(`${BASE_URL}/api/v1/legal-customers/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete legal customer');
-      router.push('/dashboard/legal-customers');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete legal customer');
-    }
-  };
+  // const handleDelete = async () => {
+  //   if (!confirm('Are you sure you want to delete this legal customer?')) return;
+  //   try {
+  //     const response = await fetch(`${BASE_URL}/api/v1/legal-customers/${id}`, { method: 'DELETE' });
+  //     if (!response.ok) throw new Error('Failed to delete legal customer');
+  //     router.push('/dashboard/legal-customers');
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : 'Failed to delete legal customer');
+  //   }
+  // };
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
