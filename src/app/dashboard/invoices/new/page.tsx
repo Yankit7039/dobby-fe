@@ -1,413 +1,313 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { FaArrowLeft, FaFileInvoiceDollar, FaUser, FaBuilding, FaCalendarAlt, FaDollarSign, FaSave, FaTimes } from "react-icons/fa";
 
 const BASE_URL = "http://localhost:8000";
 
 interface Client {
-  id: number;
+  id: string;
   name: string;
 }
 
-interface InvoiceItem {
-  description: string;
-  quantity: number;
-  unit_price: number;
-  tax_rate: number;
-}
-
-interface NewInvoice {
-  client_id: number;
-  invoice_number: string;
-  issue_date: string;
-  due_date: string;
-  items: InvoiceItem[];
-  notes: string;
-  terms: string;
+interface LegalCustomer {
+  id: string;
+  legal_name: string;
 }
 
 export default function NewInvoicePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
-
-  const [invoice, setInvoice] = useState<NewInvoice>({
-    client_id: 0,
-    invoice_number: '',
-    issue_date: new Date().toISOString().split('T')[0],
-    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    items: [
-      {
-        description: '',
-        quantity: 1,
-        unit_price: 0,
-        tax_rate: 0
-      }
-    ],
-    notes: '',
-    terms: ''
+  const [legalCustomers, setLegalCustomers] = useState<LegalCustomer[]>([]);
+  const [formData, setFormData] = useState({
+    client_id: '',
+    customer_id: '',
+    total: '',
+    currency: 'USD',
+    date_generated: new Date().toISOString().split('T')[0],
+    pdf_url: ''
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
-    const fetchClients = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`${BASE_URL}/api/v1/clients`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch clients');
-        }
-        const data = await response.json();
-        setClients(Array.isArray(data) ? data : [data]);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch clients');
+        const [clientsRes, legalCustomersRes] = await Promise.all([
+          fetch(`${BASE_URL}/api/v1/clients`),
+          fetch(`${BASE_URL}/api/v1/legal-customers`)
+        ]);
+
+        const [clientsData, legalCustomersData] = await Promise.all([
+          clientsRes.json(),
+          legalCustomersRes.json()
+        ]);
+
+        setClients(clientsData.clients || []);
+        setLegalCustomers(legalCustomersData.legal_customers || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
       }
     };
 
-    fetchClients();
+    fetchData();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const response = await fetch(`${BASE_URL}/api/v1/invoices`, {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload file to get URL
+      const token = localStorage.getItem("token");
+      const uploadResponse = await fetch(`${BASE_URL}/api/v1/upload`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(invoice),
+        body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create invoice');
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
       }
 
-      router.push('/dashboard/invoices');
+      const { url } = await uploadResponse.json();
+      setFormData(prev => ({ ...prev, pdf_url: url }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create invoice');
+      setError(err instanceof Error ? err.message : "Failed to upload file");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    
-    if (name.startsWith('items.')) {
-      const [index, field] = name.split('.');
-      const itemIndex = parseInt(index);
-      setInvoice(prev => ({
-        ...prev,
-        items: prev.items.map((item, i) => 
-          i === itemIndex 
-            ? { ...item, [field]: type === 'number' ? Number(value) : value }
-            : item
-        )
-      }));
-    } else {
-      setInvoice(prev => ({
-        ...prev,
-        [name]: type === 'number' ? Number(value) : value
-      }));
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${BASE_URL}/api/v1/invoices/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...formData,
+          total: parseFloat(formData.total)
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create invoice");
+      }
+
+      router.push("/dashboard/invoices");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const addItem = () => {
-    setInvoice(prev => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          description: '',
-          quantity: 1,
-          unit_price: 0,
-          tax_rate: 0
-        }
-      ]
-    }));
-  };
-
-  const removeItem = (index: number) => {
-    setInvoice(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
-  };
-
-  const calculateSubtotal = () => {
-    return invoice.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  };
-
-  const calculateTax = () => {
-    return invoice.items.reduce((sum, item) => {
-      const itemTotal = item.quantity * item.unit_price;
-      return sum + (itemTotal * (item.tax_rate / 100));
-    }, 0);
-  };
-
-  const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax();
-  };
-
   return (
-    <div className="p-6">
-      <div className="md:grid md:grid-cols-3 md:gap-6">
-        <div className="md:col-span-1">
-          <h3 className="text-lg font-medium leading-6 text-gray-900">New Invoice</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Create a new invoice for a client.
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Link href="/dashboard/invoices" className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-4 transition-colors">
+            <FaArrowLeft className="mr-2" />
+            Back to Invoices
+          </Link>
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Invoice</h1>
+            <p className="text-gray-600">Generate a new invoice for your client.</p>
+          </div>
         </div>
-        <div className="mt-5 md:mt-0 md:col-span-2">
-          <form onSubmit={handleSubmit}>
-            <div className="shadow sm:rounded-md sm:overflow-hidden">
-              <div className="px-4 py-5 bg-white space-y-6 sm:p-6">
-                {error && (
-                  <div className="bg-red-50 p-4 rounded-md">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-red-800">Error creating invoice</h3>
-                        <div className="mt-2 text-sm text-red-700">{error}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                <div className="grid grid-cols-6 gap-6">
-                  <div className="col-span-6 sm:col-span-3">
-                    <label htmlFor="client_id" className="block text-sm font-medium text-gray-700">
-                      Client
-                    </label>
-                    <select
-                      name="client_id"
-                      id="client_id"
-                      required
-                      value={invoice.client_id}
-                      onChange={handleChange}
-                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
-                    >
-                      <option value="">Select a client</option>
-                      {clients.map(client => (
-                        <option key={client.id} value={client.id}>
-                          {client.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800">
+            {error}
+          </div>
+        )}
 
-                  <div className="col-span-6 sm:col-span-3">
-                    <label htmlFor="invoice_number" className="block text-sm font-medium text-gray-700">
-                      Invoice Number
-                    </label>
-                    <input
-                      type="text"
-                      name="invoice_number"
-                      id="invoice_number"
-                      required
-                      value={invoice.invoice_number}
-                      onChange={handleChange}
-                      className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                    />
-                  </div>
-
-                  <div className="col-span-6 sm:col-span-3">
-                    <label htmlFor="issue_date" className="block text-sm font-medium text-gray-700">
-                      Issue Date
-                    </label>
-                    <input
-                      type="date"
-                      name="issue_date"
-                      id="issue_date"
-                      required
-                      value={invoice.issue_date}
-                      onChange={handleChange}
-                      className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                    />
-                  </div>
-
-                  <div className="col-span-6 sm:col-span-3">
-                    <label htmlFor="due_date" className="block text-sm font-medium text-gray-700">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      name="due_date"
-                      id="due_date"
-                      required
-                      value={invoice.due_date}
-                      onChange={handleChange}
-                      className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <h4 className="text-lg font-medium text-gray-900">Items</h4>
-                  <div className="mt-4 space-y-4">
-                    {invoice.items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-6 gap-4 items-end">
-                        <div className="col-span-2">
-                          <label htmlFor={`items.${index}.description`} className="block text-sm font-medium text-gray-700">
-                            Description
-                          </label>
-                          <input
-                            type="text"
-                            name={`items.${index}.description`}
-                            required
-                            value={item.description}
-                            onChange={handleChange}
-                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor={`items.${index}.quantity`} className="block text-sm font-medium text-gray-700">
-                            Quantity
-                          </label>
-                          <input
-                            type="number"
-                            name={`items.${index}.quantity`}
-                            min="1"
-                            required
-                            value={item.quantity}
-                            onChange={handleChange}
-                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor={`items.${index}.unit_price`} className="block text-sm font-medium text-gray-700">
-                            Unit Price
-                          </label>
-                          <input
-                            type="number"
-                            name={`items.${index}.unit_price`}
-                            min="0"
-                            step="0.01"
-                            required
-                            value={item.unit_price}
-                            onChange={handleChange}
-                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor={`items.${index}.tax_rate`} className="block text-sm font-medium text-gray-700">
-                            Tax Rate (%)
-                          </label>
-                          <input
-                            type="number"
-                            name={`items.${index}.tax_rate`}
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            required
-                            value={item.tax_rate}
-                            onChange={handleChange}
-                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                          />
-                        </div>
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-black"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+            <div className="flex items-center mb-6">
+              <FaFileInvoiceDollar className="text-indigo-600 mr-3 text-xl" />
+              <h2 className="text-xl font-semibold text-gray-900">Invoice Details</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="client_id" className="block text-sm font-medium text-gray-700 mb-2">
+                  Client *
+                </label>
+                <div className="relative">
+                  <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <select
+                    name="client_id"
+                    id="client_id"
+                    required
+                    value={formData.client_id}
+                    onChange={handleChange}
+                    className="text-gray-900 w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/70"
+                  >
+                    <option value="">Select a client</option>
+                    {clients.map(client => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
                     ))}
-                    <button
-                      type="button"
-                      onClick={addItem}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-black"
-                    >
-                      Add Item
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <div className="grid grid-cols-6 gap-6">
-                    <div className="col-span-6 sm:col-span-3">
-                      <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-                        Notes
-                      </label>
-                      <textarea
-                        name="notes"
-                        id="notes"
-                        rows={3}
-                        value={invoice.notes}
-                        onChange={handleChange}
-                        className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                      />
-                    </div>
-
-                    <div className="col-span-6 sm:col-span-3">
-                      <label htmlFor="terms" className="block text-sm font-medium text-gray-700">
-                        Terms
-                      </label>
-                      <textarea
-                        name="terms"
-                        id="terms"
-                        rows={3}
-                        value={invoice.terms}
-                        onChange={handleChange}
-                        className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md text-black"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 border-t border-gray-200 pt-4">
-                  <dl className="grid grid-cols-6 gap-4">
-                    <div className="col-span-4 text-right">
-                      <dt className="text-sm font-medium text-gray-500">Subtotal:</dt>
-                    </div>
-                    <div className="col-span-2">
-                      <dd className="text-sm text-gray-900">${calculateSubtotal().toFixed(2)}</dd>
-                    </div>
-                    <div className="col-span-4 text-right">
-                      <dt className="text-sm font-medium text-gray-500">Tax:</dt>
-                    </div>
-                    <div className="col-span-2">
-                      <dd className="text-sm text-gray-900">${calculateTax().toFixed(2)}</dd>
-                    </div>
-                    <div className="col-span-4 text-right">
-                      <dt className="text-base font-medium text-gray-900">Total:</dt>
-                    </div>
-                    <div className="col-span-2">
-                      <dd className="text-base font-medium text-gray-900">${calculateTotal().toFixed(2)}</dd>
-                    </div>
-                  </dl>
+                  </select>
                 </div>
               </div>
-              <div className="px-4 py-3 bg-gray-50 text-right sm:px-6">
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="mr-3 inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-black"
+
+              <div>
+                <label htmlFor="customer_id" className="block text-sm font-medium text-gray-700 mb-2">
+                  Legal Customer *
+                </label>
+                <div className="relative">
+                  <FaBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <select
+                    name="customer_id"
+                    id="customer_id"
+                    required
+                    value={formData.customer_id}
+                    onChange={handleChange}
+                    className="text-gray-900 w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/70"
+                  >
+                    <option value="">Select a legal customer</option>
+                    {legalCustomers.map(customer => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.legal_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="total" className="block text-sm font-medium text-gray-700 mb-2">
+                  Total Amount *
+                </label>
+                <div className="relative">
+                  <FaDollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="number"
+                    name="total"
+                    id="total"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={formData.total}
+                    onChange={handleChange}
+                    className="text-gray-900 w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/70"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-2">
+                  Currency *
+                </label>
+                <select
+                  name="currency"
+                  id="currency"
+                  required
+                  value={formData.currency}
+                  onChange={handleChange}
+                  className="text-gray-900 w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/70"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-black"
-                >
-                  {loading ? 'Creating...' : 'Create Invoice'}
-                </button>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="date_generated" className="block text-sm font-medium text-gray-700 mb-2">
+                  Date Generated *
+                </label>
+                <div className="relative">
+                  <FaCalendarAlt className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="date"
+                    name="date_generated"
+                    id="date_generated"
+                    required
+                    value={formData.date_generated}
+                    onChange={handleChange}
+                    className="text-gray-900 w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/70"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="pdf_file" className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload PDF
+                </label>
+                <input
+                  type="file"
+                  name="pdf_file"
+                  id="pdf_file"
+                  accept="application/pdf"
+                  onChange={handleFileChange}
+                  className="block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4
+                            file:rounded-xl file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-indigo-50 file:text-indigo-700
+                            hover:file:bg-indigo-100
+                            transition-all"
+                />
+                {selectedFile && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Selected file: {selectedFile.name}
+                  </p>
+                )}
               </div>
             </div>
-          </form>
-        </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex justify-end space-x-4">
+            <Link
+              href="/dashboard/invoices"
+              className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
+            >
+              <FaTimes className="mr-2" />
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-lg"
+            >
+              <FaSave className="mr-2" />
+              {loading ? "Creating..." : "Create Invoice"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
-} 
+}

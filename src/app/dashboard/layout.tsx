@@ -20,6 +20,15 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
 
+  const isActive = (href: string) => {
+    // Special case for Dashboard - only active when path is exactly /dashboard
+    if (href === '/dashboard') {
+      return pathname === '/dashboard';
+    }
+    // For other links, check if the current pathname starts with the href
+    return pathname.startsWith(href);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Sidebar for mobile */}
@@ -48,14 +57,14 @@ export default function DashboardLayout({
                   key={item.name}
                   href={item.href}
                   className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
-                    pathname === item.href
+                    isActive(item.href)
                       ? 'bg-gray-100 text-gray-900'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
                   <svg
                     className={`mr-4 h-6 w-6 ${
-                      pathname === item.href ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'
+                      isActive(item.href) ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'
                     }`}
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
@@ -85,14 +94,14 @@ export default function DashboardLayout({
                   key={item.name}
                   href={item.href}
                   className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                    pathname === item.href
+                    isActive(item.href)
                       ? 'bg-gray-100 text-gray-900'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
                   <svg
                     className={`mr-3 h-6 w-6 ${
-                      pathname === item.href ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'
+                      isActive(item.href) ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'
                     }`}
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
